@@ -70,7 +70,7 @@ const btn = {
 const SavedScreen = ({ onGoToLibrary, onAddNew }: { onGoToLibrary: () => void, onAddNew: () => void }) => (
   <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 0'}}>
     <div style={{fontSize:'3rem',marginBottom:'12px'}} className="animate-bounce">🎉</div>
-    <p style={{color:'#16a34a',fontWeight:500,fontSize:'18px',color:S.text}}>레시피가 저장됐어요!</p>
+    <p style={{fontWeight:500,fontSize:'18px',color:S.text}}>레시피가 저장됐어요!</p>
     <p style={{color:S.textMuted,fontSize:'13px',marginTop:'4px'}}>내 레시피에서 확인해봐요</p>
     <div style={{width:'100%',marginTop:'24px',display:'flex',flexDirection:'column',gap:'10px'}}>
       <button onClick={onGoToLibrary} style={btn.primary}>내 레시피 보러가기 →</button>
