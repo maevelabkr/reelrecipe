@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { YoutubeTranscript } from 'youtube-transcript';
-import { createClient } from '@supabase/supabase-js';
 import { detectPlatform, extractVideoId } from '@/utils/detectPlatform';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 async function getYouTubeData(videoId: string) {
   const res = await fetch(
@@ -32,6 +27,18 @@ async function getYouTubeData(videoId: string) {
   };
 }
 
+async function getTikTokData(url: string) {
+  const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`);
+  const data = await res.json();
+  if (!data.data) throw new Error('TikTok 영상을 가져올 수 없어요');
+  return {
+    title: data.data.title,
+    description: data.data.title,
+    thumbnail: data.data.cover,
+    transcript: data.data.title,
+  };
+}
+
 async function extractRecipe(rawText: string, title: string) {
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
@@ -44,9 +51,9 @@ Given the following video transcript/description, extract:
 - A list of ingredients with quantities
 - Numbered step-by-step cooking instructions
 
-Return ONLY valid JSON:
 반드시 한국어로 답해. 재료명과 조리순서 모두 한국어로 작성해.
-{"title": string, "ingredients": string[], "steps": string[]}
+Return ONLY valid JSON with no extra text:
+{"title": "string", "ingredients": ["string"], "steps": ["string"]}
 
 Video title: ${title}
 Text: ${rawText.slice(0, 3000)}`
@@ -54,8 +61,11 @@ Text: ${rawText.slice(0, 3000)}`
   });
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
-const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-return JSON.parse(clean);
+  const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  const jsonStr = clean.slice(start, end + 1);
+  return JSON.parse(jsonStr);
 }
 
 export async function POST(req: NextRequest) {
@@ -71,8 +81,10 @@ export async function POST(req: NextRequest) {
       const videoId = extractVideoId(url, platform);
       if (!videoId) throw new Error('Could not extract video ID');
       videoData = await getYouTubeData(videoId);
+    } else if (platform === 'tiktok') {
+      videoData = await getTikTokData(url);
     } else {
-      return NextResponse.json({ error: 'Only YouTube supported in MVP' }, { status: 400 });
+      return NextResponse.json({ error: 'Instagram은 아직 지원하지 않아요' }, { status: 400 });
     }
 
     const recipe = await extractRecipe(
