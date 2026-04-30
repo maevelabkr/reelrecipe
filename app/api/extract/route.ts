@@ -12,13 +12,11 @@ async function getYouTubeData(videoId: string) {
   const data = await res.json();
   const snippet = data.items?.[0]?.snippet;
   if (!snippet) throw new Error('YouTube video not found');
-
   let transcript = '';
   try {
     const lines = await YoutubeTranscript.fetchTranscript(videoId);
     transcript = lines.map((l: any) => l.text).join(' ');
   } catch {}
-
   return {
     title: snippet.title,
     description: snippet.description,
@@ -39,19 +37,19 @@ async function getTikTokData(url: string) {
   };
 }
 
-async function extractRecipe(rawText: string, title: string) {
+async function extractRecipe(rawText: string, title: string, lang: string = 'ko') {
+  const langInstruction = lang === 'ko'
+    ? '반드시 한국어로 답해. 재료명과 조리순서 모두 한국어로 작성해.'
+    : 'Answer in English. Write all ingredients and steps in English.';
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 1024,
     messages: [{
       role: 'user',
       content: `You are a recipe extraction assistant.
-Given the following video transcript/description, extract:
-- A clean recipe title
-- A list of ingredients with quantities
-- Numbered step-by-step cooking instructions
-
-반드시 한국어로 답해. 재료명과 조리순서 모두 한국어로 작성해.
+Extract: recipe title, ingredients with quantities, step-by-step cooking instructions.
+${langInstruction}
 Return ONLY valid JSON with no extra text:
 {"title": "string", "ingredients": ["string"], "steps": ["string"]}
 
@@ -64,18 +62,16 @@ Text: ${rawText.slice(0, 3000)}`
   const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const start = clean.indexOf('{');
   const end = clean.lastIndexOf('}');
-  const jsonStr = clean.slice(start, end + 1);
-  return JSON.parse(jsonStr);
+  return JSON.parse(clean.slice(start, end + 1));
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { url } = await req.json();
+    const { url, lang = 'ko' } = await req.json();
     const platform = detectPlatform(url);
     if (!platform) {
       return NextResponse.json({ error: 'Unsupported platform' }, { status: 400 });
     }
-
     let videoData: any;
     if (platform === 'youtube') {
       const videoId = extractVideoId(url, platform);
@@ -86,12 +82,11 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Instagram은 아직 지원하지 않아요' }, { status: 400 });
     }
-
     const recipe = await extractRecipe(
       videoData.transcript || videoData.description,
-      videoData.title
+      videoData.title,
+      lang
     );
-
     return NextResponse.json({
       ...recipe,
       thumbnail: videoData.thumbnail,

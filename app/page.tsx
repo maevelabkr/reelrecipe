@@ -15,9 +15,9 @@ const T = {
     noRecipe: '아직 레시피가 없어요', noRecipeSub: '유튜브 링크를 붙여넣거나\n직접 레시피를 추가해봐요!',
     startYoutube: '유튜브 링크로 추출하기', startManual: '직접 레시피 추가하기',
     share: '공유', delete: '삭제', rename: '✏️ 이름 수정', shareMenu: '🔗 공유하기',
-    deleteMenu: '🗑️ 삭제', analyzing: 'AI가 추출하고 있어요', tagAdd: '추가',
+    deleteMenu: '🗑️ 삭제', analyzing: 'AI가 추출하고 있어요', tagAdd: '추가', addTag: '태그 추가',
     recipes: '레시피', noTag: '태그 없음', addRecipeSub: '음식명이랑 조리순서만 넣으면 재료는 AI가 알아서 뽑아줘요',
-    linkCopied: '링크 복사됐어요!', noRecipes: '레시피가 없어요!',addTag: '태그 추가',
+    linkCopied: '링크 복사됐어요!', noRecipes: '레시피가 없어요!',
   },
   en: {
     extract: 'Extract', extracting: 'Analyzing...', add: 'Add', library: 'My Recipes',
@@ -31,9 +31,9 @@ const T = {
     noRecipe: 'No recipes yet', noRecipeSub: 'Paste a YouTube link or\nadd a recipe manually!',
     startYoutube: 'Extract from YouTube', startManual: 'Add recipe manually',
     share: 'Share', delete: 'Delete', rename: '✏️ Rename', shareMenu: '🔗 Share',
-    deleteMenu: '🗑️ Delete', analyzing: 'AI is extracting...', tagAdd: 'Add',
+    deleteMenu: '🗑️ Delete', analyzing: 'AI is extracting...', tagAdd: 'Add', addTag: 'Add Tag',
     recipes: 'recipes', noTag: 'No tag', addRecipeSub: 'Enter food name and steps — AI handles the rest',
-    linkCopied: 'Link copied!', noRecipes: 'No recipes!',addTag: 'Add Tag',
+    linkCopied: 'Link copied!', noRecipes: 'No recipes!',
   }
 };
 
@@ -120,9 +120,6 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
-    const handleClick = () => setMenuOpenId(null);
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
   }, []);
 
   async function loadData() {
@@ -139,7 +136,7 @@ export default function Home() {
     setLoading(true); setError(''); setRecipe(null); setSaved(false); setTags([]); setProgress(0);
     intervalRef.current = setInterval(() => { setProgress(p => Math.min(p + Math.random() * 12, 90)); }, 400);
     try {
-      const res = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const res = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, lang }) });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setRecipe(data);
@@ -220,6 +217,17 @@ export default function Home() {
     setUrl(''); setTags([]); setManualTags([]); setManualTitle(''); setManualText('');
   }
 
+  function toggleMenu(e: React.MouseEvent, colId: string) {
+    e.stopPropagation();
+    if (menuOpenId === colId) {
+      setMenuOpenId(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ x: Math.min(rect.right - 160, window.innerWidth - 170), y: rect.bottom + 8 });
+    setMenuOpenId(colId);
+  }
+
   const RecipeCard = ({ r }: { r: any }) => (
     <div style={{borderTop:`0.5px solid ${S.border}`,paddingTop:'12px'}}>
       <div style={{display:'flex',gap:'10px',cursor:'pointer'}} onClick={() => setExpandedId(expandedId===r.id ? null : r.id)}>
@@ -265,7 +273,8 @@ export default function Home() {
   );
 
   return (
-    <main style={{minHeight:'100vh',background:S.bg,maxWidth:'480px',margin:'0 auto',padding:'20px 16px',color:S.text,fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif'}}>
+    <main style={{minHeight:'100vh',background:S.bg,maxWidth:'480px',margin:'0 auto',padding:'20px 16px',color:S.text,fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif'}}
+      onClick={() => setMenuOpenId(null)}>
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px'}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
@@ -428,10 +437,9 @@ export default function Home() {
               {collections.map(col => {
                 const colRecipes = savedRecipes.filter(r => r.tags?.includes(col.name));
                 const isExpanded = expandedCollection === col.id;
-                const isMenuOpen = menuOpenId === col.id;
                 const isEditing = editingId === col.id;
                 return (
-                  <div key={col.id} style={glassCard}>
+                  <div key={col.id} style={glassCard} onClick={e => e.stopPropagation()}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between', marginBottom: isExpanded ? '16px' : '0'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',flex:1}} onClick={() => setExpandedCollection(isExpanded ? null : col.id)}>
                         <div style={{width:'36px',height:'36px',background:'rgba(255,81,0,0.08)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>🍳</div>
@@ -447,14 +455,8 @@ export default function Home() {
                           <p style={{fontSize:'12px',color:S.textMuted,margin:0}}>{t.recipes} {colRecipes.length}{lang==='ko'?'개':''}</p>
                         </div>
                       </div>
-                      <div style={{position:'relative'}}>
-                        <button onClick={e => {
-                          e.stopPropagation();
-                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          setMenuPos({ x: rect.right - 150, y: rect.bottom + 8 });
-                          setMenuOpenId(isMenuOpen ? null : col.id);
-                        }} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:S.textMuted,padding:'4px 8px',borderRadius:'8px'}}>⋯</button>
-                      </div>
+                      <button onClick={e => toggleMenu(e, col.id)}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:S.textMuted,padding:'4px 8px',borderRadius:'8px'}}>⋯</button>
                     </div>
                     {isExpanded && (
                       <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
@@ -465,7 +467,7 @@ export default function Home() {
                 );
               })}
               {savedRecipes.filter(r => !r.tags || r.tags.length === 0).length > 0 && (
-                <div style={glassCard}>
+                <div style={glassCard} onClick={e => e.stopPropagation()}>
                   <div style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}} onClick={() => setExpandedCollection('__notag__')}>
                     <div style={{width:'36px',height:'36px',background:'rgba(0,0,0,0.05)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>📌</div>
                     <div>
@@ -486,7 +488,9 @@ export default function Home() {
       )}
 
       {menuOpenId && (
-        <div style={{position:'fixed',left: menuPos.x, top: menuPos.y, background:'#fff',border:`0.5px solid ${S.border}`,borderRadius:'12px',padding:'6px',zIndex:9999,minWidth:'150px',boxShadow:'0 4px 20px rgba(0,0,0,0.12)'}}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{position:'fixed',left: menuPos.x, top: menuPos.y, background:'#fff',border:`0.5px solid ${S.border}`,borderRadius:'12px',padding:'6px',zIndex:9999,minWidth:'160px',boxShadow:'0 4px 20px rgba(0,0,0,0.12)'}}>
           <button onClick={() => { setEditingId(menuOpenId); setEditingName(collections.find(c => c.id === menuOpenId)?.name || ''); setMenuOpenId(null); }}
             style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:S.text,borderRadius:'8px'}}>{t.rename}</button>
           <button onClick={() => { shareCollection(menuOpenId); setMenuOpenId(null); }}
