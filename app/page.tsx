@@ -23,54 +23,15 @@ const glassCard: React.CSSProperties = {
 };
 
 const btn = {
-  primary: {
-    background: S.orange,
-    color: '#fff',
-    border: 'none',
-    borderRadius: '14px',
-    padding: '14px',
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    width: '100%',
-  } as React.CSSProperties,
-  secondary: {
-    background: 'rgba(0,0,0,0.05)',
-    color: S.text,
-    border: 'none',
-    borderRadius: '14px',
-    padding: '14px',
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    width: '100%',
-  } as React.CSSProperties,
-  small: {
-    background: 'rgba(0,0,0,0.05)',
-    color: S.text,
-    border: 'none',
-    borderRadius: '10px',
-    padding: '8px 14px',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  } as React.CSSProperties,
-  smallOrange: {
-    background: S.orangeLight,
-    color: S.orange,
-    border: 'none',
-    borderRadius: '10px',
-    padding: '8px 14px',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  } as React.CSSProperties,
+  primary: { background: S.orange, color: '#fff', border: 'none', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', width: '100%' } as React.CSSProperties,
+  secondary: { background: 'rgba(0,0,0,0.05)', color: S.text, border: 'none', borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', width: '100%' } as React.CSSProperties,
+  small: { background: 'rgba(0,0,0,0.05)', color: S.text, border: 'none', borderRadius: '10px', padding: '8px 14px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' } as React.CSSProperties,
 };
 
 const SavedScreen = ({ onGoToLibrary, onAddNew }: { onGoToLibrary: () => void, onAddNew: () => void }) => (
   <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 0'}}>
     <div style={{fontSize:'3rem',marginBottom:'12px'}} className="animate-bounce">🎉</div>
-    <p style={{fontWeight:500,fontSize:'18px',color:S.text}}>레시피가 저장됐어요!</p>
+    <p style={{color:'#16a34a',fontWeight:500,fontSize:'18px'}}>레시피가 저장됐어요!</p>
     <p style={{color:S.textMuted,fontSize:'13px',marginTop:'4px'}}>내 레시피에서 확인해봐요</p>
     <div style={{width:'100%',marginTop:'24px',display:'flex',flexDirection:'column',gap:'10px'}}>
       <button onClick={onGoToLibrary} style={btn.primary}>내 레시피 보러가기 →</button>
@@ -129,8 +90,10 @@ export default function Home() {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
   const [view, setView] = useState<'home' | 'library' | 'add'>('home');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedCollection, setExpandedCollection] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState('');
   const [manualText, setManualText] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
@@ -139,21 +102,24 @@ export default function Home() {
   const [manualTagInput, setManualTagInput] = useState('');
   const [manualSaved, setManualSaved] = useState(false);
   const [listening, setListening] = useState(false);
-  const [activeTag, setActiveTag] = useState<string>('전체');
   const [progress, setProgress] = useState(0);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const recognitionRef = useRef<any>(null);
   const intervalRef = useRef<any>(null);
 
-  useEffect(() => { loadRecipes(); }, []);
+  useEffect(() => { loadData(); }, []);
 
-  async function loadRecipes() {
-    const { data } = await supabase.from('recipes').select('*').order('created_at', { ascending: false });
-    if (data) setSavedRecipes(data);
+  async function loadData() {
+    const { data: recipes } = await supabase.from('recipes').select('*').order('created_at', { ascending: false });
+    if (recipes) setSavedRecipes(recipes);
+
+    const allTags = Array.from(new Set((recipes || []).flatMap((r: any) => r.tags || []))) as string[];
+    const colData = allTags.map(tag => ({ id: tag, name: tag, isTag: true }));
+    setCollections(colData);
   }
 
-  const bookmarkedRecipes = savedRecipes.filter(r => r.bookmarked);
-  const allTags = ['전체', `♥ 찜 (${bookmarkedRecipes.length})`, ...Array.from(new Set(savedRecipes.flatMap(r => r.tags || [])))];
-  const filteredRecipes = activeTag === '전체' ? savedRecipes : activeTag.startsWith('♥') ? bookmarkedRecipes : savedRecipes.filter(r => r.tags?.includes(activeTag));
   const existingTags = Array.from(new Set(savedRecipes.flatMap(r => r.tags || []))) as string[];
 
   async function handleExtract() {
@@ -198,21 +164,50 @@ export default function Home() {
   async function handleSave() {
     const { error } = await supabase.from('recipes').insert({ url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false });
     if (error) { setError(error.message); return; }
-    setSaved(true); loadRecipes();
+    setSaved(true); loadData();
   }
 
   async function handleManualSave() {
     const { error } = await supabase.from('recipes').insert({ url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false });
     if (error) { setError(error.message); return; }
-    setManualSaved(true); loadRecipes();
+    setManualSaved(true); loadData();
   }
 
   async function toggleBookmark(id: string, current: boolean) {
-    await supabase.from('recipes').update({ bookmarked: !current }).eq('id', id); loadRecipes();
+    await supabase.from('recipes').update({ bookmarked: !current }).eq('id', id); loadData();
   }
 
   async function deleteRecipe(id: string) {
-    await supabase.from('recipes').delete().eq('id', id); loadRecipes();
+    await supabase.from('recipes').delete().eq('id', id); loadData();
+  }
+
+  async function renameCollection(oldTag: string, newName: string) {
+    const recipesWithTag = savedRecipes.filter(r => r.tags?.includes(oldTag));
+    for (const r of recipesWithTag) {
+      const newTags = r.tags.map((t: string) => t === oldTag ? newName : t);
+      await supabase.from('recipes').update({ tags: newTags }).eq('id', r.id);
+    }
+    setEditingId(null);
+    loadData();
+  }
+
+  async function deleteCollection(tag: string) {
+    if (!confirm(`"${tag}" 카테고리를 삭제할까요? 레시피는 유지돼요.`)) return;
+    const recipesWithTag = savedRecipes.filter(r => r.tags?.includes(tag));
+    for (const r of recipesWithTag) {
+      const newTags = r.tags.filter((t: string) => t !== tag);
+      await supabase.from('recipes').update({ tags: newTags }).eq('id', r.id);
+    }
+    loadData();
+  }
+
+  function shareCollection(tag: string) {
+    const recipes = savedRecipes.filter(r => r.tags?.includes(tag));
+    if (recipes.length === 0) { alert('이 카테고리에 레시피가 없어요!'); return; }
+    const ids = recipes.map(r => r.id).join(',');
+    const shareUrl = `${window.location.origin}/share/collection?ids=${ids}&name=${encodeURIComponent(tag)}`;
+    navigator.clipboard.writeText(shareUrl);
+    alert('공유 링크가 복사됐어요!');
   }
 
   return (
@@ -252,7 +247,6 @@ export default function Home() {
               </button>
             </div>
           )}
-
           {loading && (
             <div style={{...glassCard, display:'flex', flexDirection:'column', alignItems:'center', gap:'16px', padding:'40px 24px'}}>
               <div style={{fontSize:'2.5rem'}} className="animate-spin">🍳</div>
@@ -263,21 +257,17 @@ export default function Home() {
               <p style={{fontSize:'12px',color:S.textMuted}}>{Math.round(progress)}% — AI가 추출하고 있어요</p>
             </div>
           )}
-
           {saved && <SavedScreen onGoToLibrary={() => setView('library')} onAddNew={() => { setSaved(false); setRecipe(null); setUrl(''); setTags([]); }} />}
-
           {!saved && !loading && recipe && (
             <div style={glassCard}>
               {recipe.thumbnail && <img src={recipe.thumbnail} alt={recipe.title} style={{width:'100%',borderRadius:'14px',marginBottom:'16px',objectFit:'cover'}} />}
               <h2 style={{fontSize:'18px',fontWeight:600,color:S.text,marginBottom:'16px'}}>{recipe.title}</h2>
-
               <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>재료</p>
               <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'16px'}}>
                 {recipe.ingredients?.map((ing: string, i: number) => (
                   <span key={i} style={{background:'rgba(255,81,0,0.08)',color:S.orange,borderRadius:'20px',padding:'5px 12px',fontSize:'12px'}}>{ing}</span>
                 ))}
               </div>
-
               <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'10px',letterSpacing:'0.05em',textTransform:'uppercase'}}>조리 순서</p>
               <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
                 {recipe.steps?.map((step: string, i: number) => (
@@ -287,7 +277,6 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-
               <div style={{borderTop:`0.5px solid ${S.border}`,paddingTop:'16px'}}>
                 <p style={{fontSize:'12px',fontWeight:600,color:S.text,marginBottom:'10px'}}>태그 추가</p>
                 <TagInput tags={tags} setTags={setTags} tagInput={tagInput} setTagInput={setTagInput} existingTags={existingTags} />
@@ -306,38 +295,31 @@ export default function Home() {
               <div style={glassCard}>
                 <h2 style={{fontSize:'17px',fontWeight:600,color:S.text,marginBottom:'4px'}}>직접 레시피 추가</h2>
                 <p style={{fontSize:'13px',color:S.textMuted,marginBottom:'16px'}}>음식명이랑 조리순서만 넣으면 재료는 AI가 알아서 뽑아줘요</p>
-
                 <button onClick={listening ? stopListening : startListening}
                   style={{...btn.small, background: listening ? '#ef4444' : 'rgba(0,0,0,0.05)', color: listening ? '#fff' : S.text, marginBottom:'16px', display:'flex', alignItems:'center', gap:'6px'}}>
                   {listening ? '🔴 녹음 중지' : '🎤 음성으로 말하기'}
                 </button>
-
                 <label style={{fontSize:'12px',fontWeight:600,color:S.text,display:'block',marginBottom:'6px'}}>음식 이름</label>
                 <input style={{width:'100%',background:'rgba(0,0,0,0.04)',border:`0.5px solid ${S.border}`,borderRadius:'12px',padding:'12px 14px',fontSize:'13px',color:S.text,outline:'none',marginBottom:'12px',boxSizing:'border-box'}}
                   placeholder="예: 김치찌개" value={manualTitle} onChange={e => setManualTitle(e.target.value)} />
-
                 <label style={{fontSize:'12px',fontWeight:600,color:S.text,display:'block',marginBottom:'6px'}}>조리 순서 (대충 써도 돼요)</label>
                 <textarea style={{width:'100%',background:'rgba(0,0,0,0.04)',border:`0.5px solid ${S.border}`,borderRadius:'12px',padding:'12px 14px',fontSize:'13px',color:S.text,outline:'none',marginBottom:'16px',minHeight:'120px',resize:'none',boxSizing:'border-box'}}
                   placeholder="예) 돼지고기 볶다가 김치 넣고 물 붓고 두부 넣어서 끓이면 됨"
                   value={manualText} onChange={e => setManualText(e.target.value)} />
-
                 <button onClick={handleManualExtract} disabled={manualLoading || (!manualText.trim() && !manualTitle.trim())}
                   style={{...btn.primary, opacity: (manualLoading || (!manualText.trim() && !manualTitle.trim())) ? 0.5 : 1}}>
                   {manualLoading ? 'AI가 정리 중...' : 'AI로 레시피 정리하기'}
                 </button>
               </div>
-
               {manualRecipe && (
                 <div style={{...glassCard, marginTop:'16px'}}>
                   <h2 style={{fontSize:'18px',fontWeight:600,color:S.text,marginBottom:'16px'}}>{manualRecipe.title}</h2>
-
                   <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>재료</p>
                   <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'16px'}}>
                     {manualRecipe.ingredients?.map((ing: string, i: number) => (
                       <span key={i} style={{background:'rgba(255,81,0,0.08)',color:S.orange,borderRadius:'20px',padding:'5px 12px',fontSize:'12px'}}>{ing}</span>
                     ))}
                   </div>
-
                   <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'10px',letterSpacing:'0.05em',textTransform:'uppercase'}}>조리 순서</p>
                   <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
                     {manualRecipe.steps?.map((step: string, i: number) => (
@@ -347,7 +329,6 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-
                   <div style={{borderTop:`0.5px solid ${S.border}`,paddingTop:'16px'}}>
                     <p style={{fontSize:'12px',fontWeight:600,color:S.text,marginBottom:'10px'}}>태그 추가</p>
                     <TagInput tags={manualTags} setTags={setManualTags} tagInput={manualTagInput} setTagInput={setManualTagInput} existingTags={existingTags} />
@@ -362,18 +343,7 @@ export default function Home() {
 
       {view === 'library' && (
         <div>
-          <div style={{display:'flex',gap:'8px',overflowX:'auto',paddingBottom:'8px',marginBottom:'16px'}}>
-            {allTags.map(t => (
-              <button key={t} onClick={() => setActiveTag(t)} style={{
-                padding:'8px 16px', borderRadius:'99px', fontSize:'13px', fontWeight:500,
-                whiteSpace:'nowrap', cursor:'pointer', border:'none',
-                background: activeTag===t ? S.orange : t.startsWith('♥') ? 'rgba(255,81,0,0.08)' : 'rgba(0,0,0,0.05)',
-                color: activeTag===t ? '#fff' : t.startsWith('♥') ? S.orange : S.text,
-              }}>{t}</button>
-            ))}
-          </div>
-
-          {filteredRecipes.length === 0 ? (
+          {collections.length === 0 ? (
             <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 1rem'}}>
               <div style={{fontSize:'3.5rem',marginBottom:'16px'}}>🍳</div>
               <h2 style={{fontSize:'17px',fontWeight:600,color:S.text,marginBottom:'8px'}}>아직 레시피가 없어요</h2>
@@ -385,57 +355,139 @@ export default function Home() {
             </div>
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-              {filteredRecipes.map(r => (
-                <div key={r.id} style={glassCard}>
-                  <div style={{display:'flex',gap:'12px',cursor:'pointer'}} onClick={() => setExpandedId(expandedId===r.id ? null : r.id)}>
-                    {r.thumbnail_url
-                      ? <img src={r.thumbnail_url} alt={r.title} style={{width:'72px',height:'72px',borderRadius:'12px',objectFit:'cover',flexShrink:0}} />
-                      : <div style={{width:'72px',height:'72px',borderRadius:'12px',background:'rgba(255,81,0,0.08)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.5rem',flexShrink:0}}>🍳</div>
-                    }
-                    <div style={{flex:1,minWidth:0}}>
-                      <h3 style={{fontSize:'14px',fontWeight:600,color:S.text,marginBottom:'6px',lineHeight:1.3}}>{r.title}</h3>
-                      <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'8px'}}>
-                        {r.tags?.map((t: string) => (
-                          <span key={t} style={{background:'rgba(255,81,0,0.08)',color:S.orange,borderRadius:'20px',padding:'2px 8px',fontSize:'11px'}}>{t}</span>
-                        ))}
+              {collections.map(col => {
+                const colRecipes = savedRecipes.filter(r => r.tags?.includes(col.name));
+                const isExpanded = expandedCollection === col.id;
+                const isMenuOpen = menuOpenId === col.id;
+                const isEditing = editingId === col.id;
+
+                return (
+                  <div key={col.id} style={glassCard}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: isExpanded ? '16px' : '0'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',flex:1}} onClick={() => setExpandedCollection(isExpanded ? null : col.id)}>
+                        <div style={{width:'36px',height:'36px',background:'rgba(255,81,0,0.08)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>🍳</div>
+                        <div>
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              value={editingName}
+                              onChange={e => setEditingName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') renameCollection(col.name, editingName); }}
+                              onClick={e => e.stopPropagation()}
+                              style={{fontSize:'15px',fontWeight:600,border:`1px solid ${S.orange}`,borderRadius:'8px',padding:'2px 8px',outline:'none',color:S.text}}
+                            />
+                          ) : (
+                            <p style={{fontSize:'15px',fontWeight:600,color:S.text,margin:0}}>{col.name}</p>
+                          )}
+                          <p style={{fontSize:'12px',color:S.textMuted,margin:0}}>레시피 {colRecipes.length}개</p>
+                        </div>
                       </div>
-                      <div style={{display:'flex',gap:'12px',alignItems:'center'}}>
-                        <button onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(`https://reelrecipe-xluo.vercel.app/share/${r.id}`).then(() => alert('공유 링크가 복사됐어요!')); }}
-  style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>
-  공유
-</button>
-                        <button onClick={e => { e.stopPropagation(); toggleBookmark(r.id, r.bookmarked); }}
-                          style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
-                          {r.bookmarked ? '♥' : '♡'}
-                        </button>
-                        <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id); }}
-                          style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>삭제</button>
+                      <div style={{position:'relative'}}>
+                        <button
+                          onClick={e => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : col.id); }}
+                          style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:S.textMuted,padding:'4px 8px',borderRadius:'8px'}}
+                        >⋯</button>
+                        {isMenuOpen && (
+                          <div style={{position:'absolute',right:0,top:'32px',background:'#fff',border:`0.5px solid ${S.border}`,borderRadius:'12px',padding:'6px',zIndex:100,minWidth:'140px',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
+                            <button onClick={e => { e.stopPropagation(); setEditingId(col.id); setEditingName(col.name); setMenuOpenId(null); }}
+                              style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:S.text,borderRadius:'8px'}}>
+                              ✏️ 이름 수정
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); shareCollection(col.name); setMenuOpenId(null); }}
+                              style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:S.text,borderRadius:'8px'}}>
+                              🔗 공유하기
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); deleteCollection(col.name); setMenuOpenId(null); }}
+                              style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:'#ef4444',borderRadius:'8px'}}>
+                              🗑️ 삭제
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <span style={{color:S.textLight,fontSize:'12px',alignSelf:'center'}}>{expandedId===r.id ? '▲' : '▼'}</span>
-                  </div>
 
-                  {expandedId === r.id && (
-                    <div style={{marginTop:'16px',borderTop:`0.5px solid ${S.border}`,paddingTop:'16px'}}>
-                      <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>재료</p>
-                      <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'16px'}}>
-                        {r.ingredients?.map((ing: string, i: number) => (
-                          <span key={i} style={{background:'rgba(255,81,0,0.08)',color:S.orange,borderRadius:'20px',padding:'5px 12px',fontSize:'12px'}}>{ing}</span>
-                        ))}
-                      </div>
-                      <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'10px',letterSpacing:'0.05em',textTransform:'uppercase'}}>조리 순서</p>
+                    {isExpanded && (
                       <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                        {r.steps?.map((step: string, i: number) => (
-                          <div key={i} style={{display:'flex',gap:'12px',alignItems:'flex-start'}}>
-                            <div style={{minWidth:'24px',height:'24px',background:S.orange,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',color:'#fff',fontWeight:600}}>{i+1}</div>
-                            <p style={{fontSize:'13px',color:S.text,lineHeight:1.6,margin:0,paddingTop:'3px'}}>{step}</p>
+                        {colRecipes.map(r => (
+                          <div key={r.id} style={{borderTop:`0.5px solid ${S.border}`,paddingTop:'12px'}}>
+                            <div style={{display:'flex',gap:'10px',cursor:'pointer'}} onClick={() => setExpandedId(expandedId===r.id ? null : r.id)}>
+                              {r.thumbnail_url
+                                ? <img src={r.thumbnail_url} alt={r.title} style={{width:'56px',height:'56px',borderRadius:'10px',objectFit:'cover',flexShrink:0}} />
+                                : <div style={{width:'56px',height:'56px',borderRadius:'10px',background:'rgba(255,81,0,0.08)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.2rem',flexShrink:0}}>🍳</div>
+                              }
+                              <div style={{flex:1}}>
+                                <p style={{fontSize:'13px',fontWeight:600,color:S.text,margin:'0 0 6px'}}>{r.title}</p>
+                                <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                                  <button onClick={e => { e.stopPropagation(); toggleBookmark(r.id, r.bookmarked); }}
+                                    style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
+                                    {r.bookmarked ? '♥' : '♡'}
+                                  </button>
+                                  <button onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/share/${r.id}`).then(() => alert('링크 복사됐어요!')); }}
+                                    style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>공유</button>
+                                  <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id); }}
+                                    style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>삭제</button>
+                                </div>
+                              </div>
+                              <span style={{color:S.textLight,fontSize:'12px',alignSelf:'center'}}>{expandedId===r.id ? '▲' : '▼'}</span>
+                            </div>
+
+                            {expandedId === r.id && (
+                              <div style={{marginTop:'12px',paddingTop:'12px',borderTop:`0.5px solid ${S.border}`}}>
+                                <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>재료</p>
+                                <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
+                                  {r.ingredients?.map((ing: string, i: number) => (
+                                    <span key={i} style={{background:'rgba(255,81,0,0.08)',color:S.orange,borderRadius:'20px',padding:'4px 10px',fontSize:'12px'}}>{ing}</span>
+                                  ))}
+                                </div>
+                                <p style={{fontSize:'12px',fontWeight:600,color:S.orange,marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>조리 순서</p>
+                                <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                                  {r.steps?.map((step: string, i: number) => (
+                                    <div key={i} style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+                                      <div style={{minWidth:'22px',height:'22px',background:S.orange,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',color:'#fff',fontWeight:600}}>{i+1}</div>
+                                      <p style={{fontSize:'13px',color:S.text,lineHeight:1.6,margin:0,paddingTop:'2px'}}>{step}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* 태그 없는 레시피 */}
+              {savedRecipes.filter(r => !r.tags || r.tags.length === 0).length > 0 && (
+                <div style={glassCard}>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}} onClick={() => setExpandedCollection('__notag__')}>
+                    <div style={{width:'36px',height:'36px',background:'rgba(0,0,0,0.05)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>📌</div>
+                    <div>
+                      <p style={{fontSize:'15px',fontWeight:600,color:S.text,margin:0}}>태그 없음</p>
+                      <p style={{fontSize:'12px',color:S.textMuted,margin:0}}>레시피 {savedRecipes.filter(r => !r.tags || r.tags.length === 0).length}개</p>
+                    </div>
+                  </div>
+                  {expandedCollection === '__notag__' && (
+                    <div style={{marginTop:'16px',display:'flex',flexDirection:'column',gap:'10px'}}>
+                      {savedRecipes.filter(r => !r.tags || r.tags.length === 0).map(r => (
+                        <div key={r.id} style={{borderTop:`0.5px solid ${S.border}`,paddingTop:'12px',display:'flex',gap:'10px'}}>
+                          {r.thumbnail_url
+                            ? <img src={r.thumbnail_url} alt={r.title} style={{width:'56px',height:'56px',borderRadius:'10px',objectFit:'cover',flexShrink:0}} />
+                            : <div style={{width:'56px',height:'56px',borderRadius:'10px',background:'rgba(0,0,0,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.2rem',flexShrink:0}}>🍳</div>
+                          }
+                          <div style={{flex:1}}>
+                            <p style={{fontSize:'13px',fontWeight:600,color:S.text,margin:'0 0 6px'}}>{r.title}</p>
+                            <div style={{display:'flex',gap:'8px'}}>
+                              <button onClick={() => deleteRecipe(r.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>삭제</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
