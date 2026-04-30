@@ -400,6 +400,10 @@ export default function Home() {
                         ))}
                       </div>
                       <div style={{display:'flex',gap:'12px',alignItems:'center'}}>
+                        <button onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(`https://reelrecipe-xluo.vercel.app/share/${r.id}`).then(() => alert('공유 링크가 복사됐어요!')); }}
+  style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>
+  공유
+</button>
                         <button onClick={e => { e.stopPropagation(); toggleBookmark(r.id, r.bookmarked); }}
                           style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
                           {r.bookmarked ? '♥' : '♡'}
