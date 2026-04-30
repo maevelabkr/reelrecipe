@@ -17,7 +17,7 @@ const T = {
     share: '공유', delete: '삭제', rename: '✏️ 이름 수정', shareMenu: '🔗 공유하기',
     deleteMenu: '🗑️ 삭제', analyzing: 'AI가 추출하고 있어요', tagAdd: '추가',
     recipes: '레시피', noTag: '태그 없음', addRecipeSub: '음식명이랑 조리순서만 넣으면 재료는 AI가 알아서 뽑아줘요',
-    linkCopied: '링크 복사됐어요!', noRecipes: '레시피가 없어요!',
+    linkCopied: '링크 복사됐어요!', noRecipes: '레시피가 없어요!',addTag: '태그 추가',
   },
   en: {
     extract: 'Extract', extracting: 'Analyzing...', add: 'Add', library: 'My Recipes',
@@ -33,7 +33,7 @@ const T = {
     share: 'Share', delete: 'Delete', rename: '✏️ Rename', shareMenu: '🔗 Share',
     deleteMenu: '🗑️ Delete', analyzing: 'AI is extracting...', tagAdd: 'Add',
     recipes: 'recipes', noTag: 'No tag', addRecipeSub: 'Enter food name and steps — AI handles the rest',
-    linkCopied: 'Link copied!', noRecipes: 'No recipes!',
+    linkCopied: 'Link copied!', noRecipes: 'No recipes!',addTag: 'Add Tag',
   }
 };
 
