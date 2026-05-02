@@ -317,13 +317,28 @@ export default function Home() {
         setCollections(allTags.map(tag => ({ id: tag, name: tag })));
       }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
+        // 비회원 레시피가 있으면 계정으로 이전
+        const guestRecipes = loadGuestRecipesFromStorage();
+        if (guestRecipes.length > 0) {
+          await Promise.all(guestRecipes.map((r: any) =>
+            supabase.from('recipes').insert({
+              user_id: session.user.id,
+              url: r.url, platform: r.platform, title: r.title,
+              ingredients: r.ingredients, steps: r.steps,
+              thumbnail_url: r.thumbnail_url, tags: r.tags, bookmarked: r.bookmarked ?? false,
+            })
+          ));
+        }
         localStorage.removeItem('rr_is_guest');
         localStorage.removeItem('rr_guest_recipes');
+        setIsGuest(false);
         loadData(session.user.id);
-      } else { setSavedRecipes([]); setCollections([]); }
+      } else {
+        setSavedRecipes([]); setCollections([]);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
