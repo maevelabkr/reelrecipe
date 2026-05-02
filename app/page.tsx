@@ -259,6 +259,8 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [guestSaveCount, setGuestSaveCount] = useState(0);
+  const GUEST_LIMIT = 3;
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -351,14 +353,32 @@ export default function Home() {
   function stopListening() { recognitionRef.current?.stop(); setListening(false); }
 
   async function handleSave() {
-    if (!user) { setShowLoginModal(true); return; }
+    if (!user) {
+      if (guestSaveCount >= GUEST_LIMIT) { setShowLoginModal(true); return; }
+      const newRecipe = { id: crypto.randomUUID(), url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false, created_at: new Date().toISOString() };
+      setSavedRecipes(prev => [newRecipe, ...prev]);
+      const allTags = Array.from(new Set([newRecipe, ...savedRecipes].flatMap((r: any) => r.tags || []))) as string[];
+      setCollections(allTags.map(tag => ({ id: tag, name: tag })));
+      setGuestSaveCount(c => c + 1);
+      setSaved(true);
+      return;
+    }
     const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setSaved(true); loadData();
   }
 
   async function handleManualSave() {
-    if (!user) { setShowLoginModal(true); return; }
+    if (!user) {
+      if (guestSaveCount >= GUEST_LIMIT) { setShowLoginModal(true); return; }
+      const newRecipe = { id: crypto.randomUUID(), url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false, created_at: new Date().toISOString() };
+      setSavedRecipes(prev => [newRecipe, ...prev]);
+      const allTags = Array.from(new Set([newRecipe, ...savedRecipes].flatMap((r: any) => r.tags || []))) as string[];
+      setCollections(allTags.map(tag => ({ id: tag, name: tag })));
+      setGuestSaveCount(c => c + 1);
+      setManualSaved(true);
+      return;
+    }
     const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setManualSaved(true); loadData();
@@ -523,6 +543,17 @@ export default function Home() {
               <div style={{fontSize:'3rem',marginBottom:'12px'}} className="animate-bounce">🎉</div>
               <p style={{color:'#16a34a',fontWeight:500,fontSize:'18px'}}>{t.saved}</p>
               <p style={{color:S.textMuted,fontSize:'13px',marginTop:'4px'}}>{t.savedSub}</p>
+              {isGuest && (
+                <div style={{marginTop:'12px',background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:'10px',padding:'10px 14px',width:'100%',boxSizing:'border-box'}}>
+                  <p style={{fontSize:'12px',color:'#92400e',textAlign:'center',lineHeight:1.6}}>
+                    ⚠️ 로그인하지 않으면 레시피가 사라질 수 있어요!<br/>
+                    <button onClick={() => setShowLoginModal(true)} style={{background:'none',border:'none',color:'#b45309',fontWeight:600,cursor:'pointer',fontSize:'12px',textDecoration:'underline',padding:0}}>
+                      지금 로그인하고 영구 저장하기 →
+                    </button>
+                  </p>
+                  <p style={{fontSize:'11px',color:'#b45309',textAlign:'center',marginTop:'4px'}}>({GUEST_LIMIT - guestSaveCount}개 더 저장 가능)</p>
+                </div>
+              )}
               <div style={{width:'100%',marginTop:'24px',display:'flex',flexDirection:'column',gap:'10px'}}>
                 <button onClick={() => setView('library')}
                   onMouseDown={(e) => (e.currentTarget as HTMLElement).style.transform = 'scale(0.95)'}
@@ -574,6 +605,17 @@ export default function Home() {
               <div style={{fontSize:'3rem',marginBottom:'12px'}} className="animate-bounce">🎉</div>
               <p style={{color:'#16a34a',fontWeight:500,fontSize:'18px'}}>{t.saved}</p>
               <p style={{color:S.textMuted,fontSize:'13px',marginTop:'4px'}}>{t.savedSub}</p>
+              {isGuest && (
+                <div style={{marginTop:'12px',background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:'10px',padding:'10px 14px',width:'100%',boxSizing:'border-box'}}>
+                  <p style={{fontSize:'12px',color:'#92400e',textAlign:'center',lineHeight:1.6}}>
+                    ⚠️ 로그인하지 않으면 레시피가 사라질 수 있어요!<br/>
+                    <button onClick={() => setShowLoginModal(true)} style={{background:'none',border:'none',color:'#b45309',fontWeight:600,cursor:'pointer',fontSize:'12px',textDecoration:'underline',padding:0}}>
+                      지금 로그인하고 영구 저장하기 →
+                    </button>
+                  </p>
+                  <p style={{fontSize:'11px',color:'#b45309',textAlign:'center',marginTop:'4px'}}>({GUEST_LIMIT - guestSaveCount}개 더 저장 가능)</p>
+                </div>
+              )}
               <div style={{width:'100%',marginTop:'24px',display:'flex',flexDirection:'column',gap:'10px'}}>
                 <button onClick={() => setView('library')}
                   onMouseDown={(e) => (e.currentTarget as HTMLElement).style.transform = 'scale(0.95)'}
