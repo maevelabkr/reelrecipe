@@ -1,0 +1,8 @@
+'use client';
+import dynamic from 'next/dynamic';
+
+const CollectionClient = dynamic(() => import('./CollectionClient'), { ssr: false });
+
+export default function CollectionSharePage() {
+  return <CollectionClient />;
+}
