@@ -160,7 +160,7 @@ function TagInput({ tags, setTags, tagInput, setTagInput, existingTags, suggeste
   );
 }
 
-function LoginScreen({ lang }: { lang: 'ko' | 'en' }) {
+function LoginScreen({ lang, onGuest }: { lang: 'ko' | 'en', onGuest: () => void }) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -237,6 +237,13 @@ function LoginScreen({ lang }: { lang: 'ko' | 'en' }) {
           )}
         </div>
 
+        <button
+          onClick={onGuest}
+          style={{ background: 'none', border: 'none', color: S.textMuted, fontSize: '14px', cursor: 'pointer', letterSpacing: '-0.2px', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+        >
+          비회원으로 시작하기
+        </button>
+
         <p style={{ fontSize: '12px', color: S.textLight, textAlign: 'center', lineHeight: 1.6 }}>
           로그인하면 레시피가 내 계정에 저장돼요.<br />어디서든 불러올 수 있어요.
         </p>
@@ -250,6 +257,7 @@ export default function Home() {
   const t = T[lang];
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -342,13 +350,15 @@ export default function Home() {
   function stopListening() { recognitionRef.current?.stop(); setListening(false); }
 
   async function handleSave() {
-    const { error } = await supabase.from('recipes').insert({ user_id: user?.id, url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false });
+    if (!user) { setIsGuest(false); return; }
+    const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setSaved(true); loadData();
   }
 
   async function handleManualSave() {
-    const { error } = await supabase.from('recipes').insert({ user_id: user?.id, url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false });
+    if (!user) { setIsGuest(false); return; }
+    const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setManualSaved(true); loadData();
   }
@@ -451,7 +461,7 @@ export default function Home() {
     </main>
   );
 
-  if (!user) return <LoginScreen lang={lang} />;
+  if (!user && !isGuest) return <LoginScreen lang={lang} onGuest={() => setIsGuest(true)} />;
 
   return (
     <main style={{minHeight:'100vh',background:S.bg,maxWidth:'480px',margin:'0 auto',padding:'20px 16px',color:S.text,fontFamily:'SF Pro Display, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'}}
@@ -471,10 +481,16 @@ export default function Home() {
           <button onClick={() => setView('library')} style={{...btn.small, background: view==='library' ? S.blue : '#1d1d1f', color: '#fff', whiteSpace:'nowrap'}}>
             {t.library} {savedRecipes.length > 0 && `(${savedRecipes.length})`}
           </button>
-          <button onClick={() => supabase.auth.signOut()} style={{background:'rgba(0,0,0,0.05)',border:'none',borderRadius:'8px',padding:'4px 8px',fontSize:'13px',cursor:'pointer',color:S.textMuted,whiteSpace:'nowrap'}} title={user.email ?? '로그아웃'}>⏻</button>
+          <button onClick={() => supabase.auth.signOut()} style={{background:'rgba(0,0,0,0.05)',border:'none',borderRadius:'8px',padding:'4px 8px',fontSize:'13px',cursor:'pointer',color:S.textMuted,whiteSpace:'nowrap'}} title={user?.email ?? '로그아웃'}>⏻</button>
         </div>
       </div>
 
+      {isGuest && (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:S.blueLight,border:`1px solid ${S.blue}`,borderRadius:'12px',padding:'10px 14px',marginBottom:'16px',gap:'10px'}}>
+          <p style={{fontSize:'13px',color:S.blue,margin:0}}>로그인하면 레시피가 저장돼요</p>
+          <button onClick={() => setIsGuest(false)} style={{background:S.blue,color:'#fff',border:'none',borderRadius:'9999px',padding:'5px 12px',fontSize:'12px',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>로그인</button>
+        </div>
+      )}
       {error && <p style={{color:'#ef4444',fontSize:'13px',marginBottom:'16px'}}>{error}</p>}
 
       {view === 'home' && (
