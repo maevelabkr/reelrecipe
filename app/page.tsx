@@ -465,7 +465,7 @@ export default function Home() {
 
     if (!user) {
       // 비회원: 레시피 데이터를 URL에 인코딩
-      const payload = btoa(JSON.stringify({ name: tag, recipes }));
+      const payload = encodeURIComponent(JSON.stringify({ name: tag, recipes }));
       navigator.clipboard.writeText(`${window.location.origin}/share/preview-collection?data=${payload}`);
     } else {
       const ids = recipes.map(r => r.id).join(',');
@@ -504,7 +504,7 @@ export default function Home() {
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
               {r.bookmarked ? '♥' : '♡'}
             </button>
-            <button onClick={e => { e.stopPropagation(); if (!user) { const payload = btoa(JSON.stringify(r)); navigator.clipboard.writeText(`${window.location.origin}/share/preview?data=${payload}`); } else { navigator.clipboard.writeText(`${window.location.origin}/share/${r.id}`); } alert(t.linkCopied); }}
+            <button onClick={async e => { e.stopPropagation(); const url = !user ? `${window.location.origin}/share/preview?data=${encodeURIComponent(JSON.stringify(r))}` : `${window.location.origin}/share/${r.id}`; try { await navigator.clipboard.writeText(url); } catch { prompt('링크를 복사해주세요:', url); return; } alert(t.linkCopied); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>{t.share}</button>
             <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>{t.delete}</button>

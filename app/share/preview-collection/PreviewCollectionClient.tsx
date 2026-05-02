@@ -19,7 +19,7 @@ export default function PreviewCollectionClient() {
     try {
       const raw = params.get('data');
       if (!raw) return;
-      const parsed = JSON.parse(atob(raw));
+      const parsed = JSON.parse(decodeURIComponent(raw));
       setName(parsed.name ?? '공유된 식단');
       setRecipes(parsed.recipes ?? []);
     } catch {}

@@ -17,7 +17,7 @@ export default function PreviewClient() {
     try {
       const raw = params.get('data');
       if (!raw) return;
-      setRecipe(JSON.parse(atob(raw)));
+      setRecipe(JSON.parse(decodeURIComponent(raw)));
     } catch {}
   }, []);
 
