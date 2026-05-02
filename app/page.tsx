@@ -407,22 +407,18 @@ export default function Home() {
     loadData();
   }
 
-  async function shareCollection(tag: string) {
+  function shareCollection(tag: string) {
     const recipes = savedRecipes.filter(r => r.tags?.includes(tag));
     if (recipes.length === 0) { alert(t.noRecipes); return; }
 
-    let ids: string[];
     if (!user) {
-      // 비회원: DB에 임시 저장 후 공유
-      const inserts = await Promise.all(recipes.map(r =>
-        supabase.from('recipes').insert({ url: r.url, platform: r.platform, title: r.title, ingredients: r.ingredients, steps: r.steps, thumbnail_url: r.thumbnail_url, tags: r.tags, bookmarked: false }).select('id').single()
-      ));
-      ids = inserts.map(({ data }) => data?.id).filter(Boolean);
+      // 비회원: 레시피 데이터를 URL에 인코딩
+      const payload = btoa(JSON.stringify({ name: tag, recipes }));
+      navigator.clipboard.writeText(`${window.location.origin}/share/preview-collection?data=${payload}`);
     } else {
-      ids = recipes.map(r => r.id);
+      const ids = recipes.map(r => r.id).join(',');
+      navigator.clipboard.writeText(`${window.location.origin}/share/collection?ids=${ids}&name=${encodeURIComponent(tag)}`);
     }
-
-    navigator.clipboard.writeText(`${window.location.origin}/share/collection?ids=${ids.join(',')}&name=${encodeURIComponent(tag)}`);
     alert(t.linkCopied);
   }
 
@@ -456,7 +452,7 @@ export default function Home() {
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
               {r.bookmarked ? '♥' : '♡'}
             </button>
-            <button onClick={async e => { e.stopPropagation(); let shareId = r.id; if (!user) { const { data } = await supabase.from('recipes').insert({ url: r.url, platform: r.platform, title: r.title, ingredients: r.ingredients, steps: r.steps, thumbnail_url: r.thumbnail_url, tags: r.tags, bookmarked: false }).select('id').single(); if (data) shareId = data.id; } navigator.clipboard.writeText(`${window.location.origin}/share/${shareId}`); alert(t.linkCopied); }}
+            <button onClick={e => { e.stopPropagation(); if (!user) { const payload = btoa(JSON.stringify(r)); navigator.clipboard.writeText(`${window.location.origin}/share/preview?data=${payload}`); } else { navigator.clipboard.writeText(`${window.location.origin}/share/${r.id}`); } alert(t.linkCopied); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>{t.share}</button>
             <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>{t.delete}</button>
