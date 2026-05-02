@@ -745,7 +745,7 @@ export default function Home() {
 
       {view === 'library' && (
         <div>
-          {collections.length === 0 ? (
+          {savedRecipes.length === 0 ? (
             <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 1rem'}}>
               <div style={{fontSize:'3.5rem',marginBottom:'16px'}}>🍳</div>
               <h2 style={{fontSize:'17px',fontWeight:600,marginBottom:'8px'}}>{t.noRecipe}</h2>
