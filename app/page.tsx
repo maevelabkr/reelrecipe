@@ -408,6 +408,7 @@ export default function Home() {
   }
 
   function shareCollection(tag: string) {
+    if (!user) { setShowLoginModal(true); return; }
     const recipes = savedRecipes.filter(r => r.tags?.includes(tag));
     if (recipes.length === 0) { alert(t.noRecipes); return; }
     const ids = recipes.map(r => r.id).join(',');
@@ -445,7 +446,7 @@ export default function Home() {
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color: r.bookmarked ? '#ef4444' : '#ccc',padding:0}}>
               {r.bookmarked ? '♥' : '♡'}
             </button>
-            <button onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/share/${r.id}`).then(() => alert(t.linkCopied)); }}
+            <button onClick={e => { e.stopPropagation(); if (!user) { setShowLoginModal(true); return; } navigator.clipboard.writeText(`${window.location.origin}/share/${r.id}`).then(() => alert(t.linkCopied)); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:S.textMuted,padding:0}}>{t.share}</button>
             <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id); }}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:'12px',color:'#ef4444',padding:0}}>{t.delete}</button>
