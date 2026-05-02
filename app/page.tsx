@@ -261,6 +261,14 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [guestSaveCount, setGuestSaveCount] = useState(0);
   const GUEST_LIMIT = 3;
+
+  function saveGuestRecipesToStorage(recipes: any[]) {
+    localStorage.setItem('rr_guest_recipes', JSON.stringify(recipes));
+  }
+
+  function loadGuestRecipesFromStorage(): any[] {
+    try { return JSON.parse(localStorage.getItem('rr_guest_recipes') || '[]'); } catch { return []; }
+  }
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -290,15 +298,32 @@ export default function Home() {
   const intervalRef = useRef<any>(null);
 
   useEffect(() => {
+    // 비회원 상태 복원
+    const wasGuest = localStorage.getItem('rr_is_guest') === 'true';
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
-      if (session?.user) loadData(session.user.id);
+      if (session?.user) {
+        localStorage.removeItem('rr_is_guest');
+        loadData(session.user.id);
+      } else if (wasGuest) {
+        // 비회원 복원
+        const stored = loadGuestRecipesFromStorage();
+        setIsGuest(true);
+        setSavedRecipes(stored);
+        setGuestSaveCount(stored.length);
+        const allTags = Array.from(new Set(stored.flatMap((r: any) => r.tags || []))) as string[];
+        setCollections(allTags.map(tag => ({ id: tag, name: tag })));
+      }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) loadData(session.user.id);
-      else { setSavedRecipes([]); setCollections([]); }
+      if (session?.user) {
+        localStorage.removeItem('rr_is_guest');
+        localStorage.removeItem('rr_guest_recipes');
+        loadData(session.user.id);
+      } else { setSavedRecipes([]); setCollections([]); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -356,8 +381,10 @@ export default function Home() {
     if (!user) {
       if (guestSaveCount >= GUEST_LIMIT) { setShowLoginModal(true); return; }
       const newRecipe = { id: crypto.randomUUID(), url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false, created_at: new Date().toISOString() };
-      setSavedRecipes(prev => [newRecipe, ...prev]);
-      const allTags = Array.from(new Set([newRecipe, ...savedRecipes].flatMap((r: any) => r.tags || []))) as string[];
+      const updated = [newRecipe, ...savedRecipes];
+      setSavedRecipes(updated);
+      saveGuestRecipesToStorage(updated);
+      const allTags = Array.from(new Set(updated.flatMap((r: any) => r.tags || []))) as string[];
       setCollections(allTags.map(tag => ({ id: tag, name: tag })));
       setGuestSaveCount(c => c + 1);
       setSaved(true);
@@ -372,8 +399,10 @@ export default function Home() {
     if (!user) {
       if (guestSaveCount >= GUEST_LIMIT) { setShowLoginModal(true); return; }
       const newRecipe = { id: crypto.randomUUID(), url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false, created_at: new Date().toISOString() };
-      setSavedRecipes(prev => [newRecipe, ...prev]);
-      const allTags = Array.from(new Set([newRecipe, ...savedRecipes].flatMap((r: any) => r.tags || []))) as string[];
+      const updated = [newRecipe, ...savedRecipes];
+      setSavedRecipes(updated);
+      saveGuestRecipesToStorage(updated);
+      const allTags = Array.from(new Set(updated.flatMap((r: any) => r.tags || []))) as string[];
       setCollections(allTags.map(tag => ({ id: tag, name: tag })));
       setGuestSaveCount(c => c + 1);
       setManualSaved(true);
@@ -389,6 +418,14 @@ export default function Home() {
   }
 
   async function deleteRecipe(id: string) {
+    if (!user) {
+      const updated = savedRecipes.filter(r => r.id !== id);
+      setSavedRecipes(updated);
+      saveGuestRecipesToStorage(updated);
+      const allTags = Array.from(new Set(updated.flatMap((r: any) => r.tags || []))) as string[];
+      setCollections(allTags.map(tag => ({ id: tag, name: tag })));
+      return;
+    }
     await supabase.from('recipes').delete().eq('id', id); loadData();
   }
 
@@ -489,7 +526,7 @@ export default function Home() {
     </main>
   );
 
-  if (!user && !isGuest) return <LoginScreen lang={lang} onGuest={() => setIsGuest(true)} />;
+  if (!user && !isGuest) return <LoginScreen lang={lang} onGuest={() => { setIsGuest(true); localStorage.setItem('rr_is_guest', 'true'); }} />;
 
   return (
     <main style={{minHeight:'100vh',background:S.bg,maxWidth:'480px',margin:'0 auto',padding:'20px 16px',color:S.text,fontFamily:'SF Pro Display, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'}}
