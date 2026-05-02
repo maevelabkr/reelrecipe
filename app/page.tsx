@@ -258,6 +258,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -350,14 +351,14 @@ export default function Home() {
   function stopListening() { recognitionRef.current?.stop(); setListening(false); }
 
   async function handleSave() {
-    if (!user) { setIsGuest(false); return; }
+    if (!user) { setShowLoginModal(true); return; }
     const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: recipe.url, platform: recipe.platform, title: recipe.title, ingredients: recipe.ingredients, steps: recipe.steps, thumbnail_url: recipe.thumbnail, tags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setSaved(true); loadData();
   }
 
   async function handleManualSave() {
-    if (!user) { setIsGuest(false); return; }
+    if (!user) { setShowLoginModal(true); return; }
     const { error } = await supabase.from('recipes').insert({ user_id: user.id, url: '', platform: 'manual', title: manualRecipe.title, ingredients: manualRecipe.ingredients, steps: manualRecipe.steps, thumbnail_url: null, tags: manualTags, bookmarked: false });
     if (error) { setError(error.message); return; }
     setManualSaved(true); loadData();
@@ -724,6 +725,28 @@ export default function Home() {
             style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:S.text,borderRadius:'8px'}}>{t.shareMenu}</button>
           <button onClick={() => { deleteCollection(menuOpenId); setMenuOpenId(null); }}
             style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',padding:'8px 12px',fontSize:'13px',cursor:'pointer',color:'#ef4444',borderRadius:'8px'}}>{t.deleteMenu}</button>
+        </div>
+      )}
+
+      {showLoginModal && (
+        <div onClick={() => setShowLoginModal(false)}
+          style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:10000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e => e.stopPropagation()}
+            style={{background:'#fff',borderRadius:'24px 24px 0 0',padding:'32px 24px 40px',width:'100%',maxWidth:'480px',display:'flex',flexDirection:'column',gap:'12px'}}>
+            <div style={{width:'36px',height:'4px',background:S.border,borderRadius:'9999px',margin:'0 auto 8px'}} />
+            <h2 style={{fontSize:'20px',fontWeight:700,letterSpacing:'-0.4px',marginBottom:'4px'}}>저장하려면 로그인이 필요해요</h2>
+            <p style={{fontSize:'14px',color:S.textMuted,marginBottom:'8px'}}>로그인하면 레시피가 내 계정에 저장돼요</p>
+            <button
+              onClick={async () => { await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } }); }}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',width:'100%',padding:'14px',background:S.text,color:'#fff',border:'none',borderRadius:'9999px',fontSize:'15px',fontWeight:500,cursor:'pointer'}}>
+              <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+              Google로 로그인
+            </button>
+            <button onClick={() => setShowLoginModal(false)}
+              style={{width:'100%',padding:'14px',background:'transparent',border:`1px solid ${S.border}`,borderRadius:'9999px',fontSize:'15px',color:S.textMuted,cursor:'pointer'}}>
+              계속 둘러보기
+            </button>
+          </div>
         </div>
       )}
     </main>
